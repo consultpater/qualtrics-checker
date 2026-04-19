@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Qualtrics Checker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1f232c;
+    --text: #e6e8eb;
+    --muted: #9aa0a6;
+    --accent: #6ee7b7;
+    --warn: #fbbf24;
+    --err: #f87171;
+    --ok: #34d399;
+    --border: #2a2f3a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.45;
+  }
+  header {
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  header h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0.2px; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 28px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 20px;
+  }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  textarea, input[type=file] {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+  }
+  textarea { min-height: 120px; resize: vertical; }
+  .row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  button {
+    background: var(--accent);
+    color: #0a0c10;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .pill.match   { background: rgba(52,211,153,0.15); color: var(--ok); }
+  .pill.typo    { background: rgba(251,191,36,0.15); color: var(--warn); }
+  .pill.missing { background: rgba(248,113,113,0.15); color: var(--err); }
+  .pill.extra   { background: rgba(110,231,183,0.15); color: var(--accent); }
+  .report-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px;
+  }
+  .report-head .url {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px; color: var(--muted); word-break: break-all;
+  }
+  .stats { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .stats .stat {
+    background: var(--panel-2); padding: 6px 10px; border-radius: 6px;
+    font-size: 12px; color: var(--muted);
+  }
+  .stats .stat b { color: var(--text); }
+  .errors { color: var(--err); font-size: 13px; margin-bottom: 10px; }
+  .errors li { margin-bottom: 4px; }
+  .matches {
+    margin: 0; padding: 0; list-style: none;
+    border-top: 1px solid var(--border);
+  }
+  .matches li {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    display: grid; grid-template-columns: 90px 1fr; gap: 12px; align-items: start;
+  }
+  .matches .q { font-size: 13px; }
+  .matches .q .expected, .matches .q .actual {
+    display: block; padding: 2px 0;
+  }
+  .matches .q .expected { color: var(--text); }
+  .matches .q .actual { color: var(--muted); font-size: 12px; }
+  .loader {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.2); border-top-color: var(--text);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    vertical-align: -2px; margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-banner {
+    background: rgba(248,113,113,0.1);
+    border: 1px solid rgba(248,113,113,0.4);
+    color: var(--err);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Qualtrics Checker</h1>
+    <span class="sub">verify live surveys against an uploaded spec</span>
+  </header>
+  <main>
+    <form id="f" class="card">
+      <div class="row">
+        <div>
+          <label for="links">Qualtrics links (one per line)</label>
+          <textarea id="links" name="links" placeholder="https://yourorg.qualtrics.com/jfe/form/SV_XXXXXXXXX"></textarea>
+        </div>
+        <div>
+          <label for="spec">Spec file (.pdf or .docx)</label>
+          <input id="spec" name="spec" type="file" accept=".pdf,.docx" required />
+        </div>
+      </div>
+      <div style="margin-top:14px; display:flex; justify-content:flex-end; align-items:center; gap:12px;">
+        <span id="status" style="color:var(--muted); font-size:12px;"></span>
+        <button id="go" type="submit">Run check</button>
+      </div>
+    </form>
+    <div id="out"></div>
+  </main>
+
+<script>
+const form = document.getElementById('f');
+const out = document.getElementById('out');
+const statusEl = document.getElementById('status');
+const goBtn = document.getElementById('go');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  out.innerHTML = '';
+  goBtn.disabled = true;
+  statusEl.innerHTML = '<span class="loader"></span> Walking survey… this can take a minute.';
+  const fd = new FormData(form);
+  try {
+    const res = await fetch('/api/check', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) {
+      out.innerHTML = `<div class="error-banner">${data.error || 'Request failed'}</div>`;
+      return;
+    }
+    render(data);
+  } catch (err) {
+    out.innerHTML = `<div class="error-banner">Error: ${err}</div>`;
+  } finally {
+    statusEl.innerHTML = '';
+    goBtn.disabled = false;
+  }
+});
+
+function esc(s) {
+  return (s || '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
+  );
+}
+
+function render(data) {
+  const parts = [];
+  parts.push(`<div class="card"><b>${data.spec_count}</b> questions parsed from spec.</div>`);
+  for (const r of data.reports) {
+    const s = r.summary || {};
+    parts.push(`
+      <div class="card">
+        <div class="report-head">
+          <span class="url">${esc(r.url)}</span>
+          <span class="pill ${r.ok ? 'match' : 'missing'}">${r.ok ? 'OK' : 'FAILED'}</span>
+        </div>
+        <div class="stats">
+          <div class="stat">Pages: <b>${r.pages_visited}</b></div>
+          <div class="stat">Matched: <b>${s.match || 0}</b></div>
+          <div class="stat">Typos: <b>${s.typo || 0}</b></div>
+          <div class="stat">Missing from survey: <b>${s.missing || 0}</b></div>
+          <div class="stat">Extra on survey: <b>${s.extra || 0}</b></div>
+        </div>
+        ${r.errors?.length ? `<ul class="errors">${r.errors.map(e => `<li>⚠ ${esc(e)}</li>`).join('')}</ul>` : ''}
+        <ul class="matches">
+          ${(r.matches || []).map(m => `
+            <li>
+              <span class="pill ${m.status}">${m.status}${m.score ? ' ' + Math.round(m.score) : ''}</span>
+              <div class="q">
+                ${m.spec ? `<span class="expected">📄 ${esc(m.spec.text)}</span>` : ''}
+                ${m.found ? `<span class="actual">🌐 p${m.found.page} · ${esc(m.found.type)} · ${esc(m.found.text)}</span>` : ''}
+              </div>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    `);
+  }
+  out.innerHTML = parts.join('');
+}
+</script>
+</body>
+</html>
